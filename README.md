@@ -1,5 +1,8 @@
 # linux-gnome-catchmitm
 
+This is an alpha stage dev project. Still lots of cleanup to do. Some settings are being added by hardcoding. Next step is to integrate with Libhandy and perhaps create a QT version.
+
+
 FOR UBUNTU
 
 sudo snap install pycharm-community --classic
