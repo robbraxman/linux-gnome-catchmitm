@@ -541,9 +541,6 @@ class MainWindow(Gtk.Window):
             try:
                 mac = pkt[ARP].hwsrc
 
-                #for Video
-                #if( mac == "90:72:40:0b:e1:83"):
-                #    mac = "00:00:0c:0b:e1:82"
                 if pkt[ARP].psrc in self.deviceList:
                     return
                 self.deviceList[pkt[ARP].psrc] = mac
