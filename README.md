@@ -1,7 +1,8 @@
 # linux-gnome-catchmitm
+(C) Copyright Rob Braxman 2019 - GPL V3 License - Free Software
+
 
 This is an alpha stage dev project. Still lots of cleanup to do. Some settings are being added by hardcoding. Next step is to integrate with Libhandy and perhaps create a QT version.
-
 
 FOR UBUNTU
 
