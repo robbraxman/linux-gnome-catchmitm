@@ -32,8 +32,8 @@ class MainWindow(Gtk.Window):
     discovered_if = ''
     deviceList = {}
     vendorList = {}
-    portList = {'22':'ssh','443':'https','80':'http','53':'dns','143':'imap','465':'smtp/s','993':'imap/s','110':'pop3',
-                '5353':'mdns','1900':'upnp'
+    portList = {'22':'ssh','443':'https','80':'http','8080':'privateweb','53':'dns','143':'imap','465':'smtp/s','993':'imap/s','110':'pop3',
+                '5353':'mdns','1900':'upnp','5900':'vnc','20':'ftp','25':'smtp','137':'netbios','161':'snmp'
                }
     deviceDescList = {}
     monitorLock = False
@@ -41,65 +41,107 @@ class MainWindow(Gtk.Window):
     jamStatus = False
     subnet = ""
     netmask = ""
-    installDir = "/home/linux/Documents/PythonGnome/"
+    installDir = ""
+    appdataDir = "appdata/"
+    netDevice = ""
+    portScanningStatus = False
 
     def __init__(self):
 
         #os.system('clear')
         print('Starting Catch MITM')
 
-        self.monitorLock = threading.Semaphore()
 
         try:
-            self.deviceDescList = pickle.load(open("_devicelist.dict", "rb"))
+            self.deviceDescList = pickle.load(open(self.appdataDir+"_devicelist.dict", "rb"))
         except:
-            print('No devlicelist')
+            print('No devicelist')
 
+        self.ui_gtk_init()
+
+        self.monitorLock = threading.Semaphore()
+        self.discoverNetDevice()
+        #---------------------------------------------------
+        os.system("sudo ifconfig "+self.netDevice+" promisc")
+        #---------------------------------------------------
+
+        #cleanupThread = threading.Thread(target=self.treeCleanup, )
+        #cleanupThread.daemon = True
+        #daemons get automatically closed when app exits
+        #cleanupThread.start()
+
+
+    def ui_gtk_init(self):
+        #---------------------------------------------------
+        # GTK+ 3 UI
+        #---------------------------------------------------
+
+
+        #---------------------------------------------------
+        # Set Up Main Window
+        #---------------------------------------------------
         Gtk.Window.__init__(self, title="Catch Man-in-the-Middle")
-        self.set_size_request(400, 600)
+        self.set_size_request(400, 700)
         self.set_border_width(10)
 
         self.timeout_id = None
         self.set_icon_from_file("lock-orig.png")
 
         #---------------------------------------------------
+        # Set Up Notebook Container
+        #---------------------------------------------------
         self.notebook = Gtk.Notebook()
         self.add(self.notebook)
 
         #---------------------------------------------------
+        # Set Up Notebook Page 1
         #---------------------------------------------------
-        gridMenu = Gtk.Grid()
-        gridMenu.set_size_request(400,600)
+        # Setup Grid
+        gridStart = Gtk.Grid()
+        #---------------------------------------------------
+        gridStart.set_size_request(400,700)
 
-        self.imageMenu = Gtk.Image()
-        self.imageMenu.set_from_file("bigstock-hacker.jpg")
+        imageStart = Gtk.Image()
+        imageStart.set_from_file("bigstock-hacker.jpg")
 
-        self.imageLogo = Gtk.Image()
-        self.imageLogo.set_from_file("lock-orig-50.png")
+        imageLogo = Gtk.Image()
+        imageLogo.set_from_file("lock-orig-50.png")
 
-        self.labelMenu = Gtk.Label()
-        self.labelMenu.set_justify(Gtk.Justification.CENTER)
-        self.labelMenu.set_markup("\n<big><big><big><b>Catch the Man-in-the-Middle</b></big></big></big>\n\n")
+        labelStart = Gtk.Label()
+        labelStart.set_justify(Gtk.Justification.CENTER)
+        labelStart.set_markup("\n<big><big><big><b>Catch the Man-in-the-Middle</b></big></big></big>\n\n")
 
-        gridMenu.attach(self.imageLogo,0,0,3,1)
-        gridMenu.attach(self.labelMenu,0,1,3,1)
+        labelCredit = Gtk.Label()
+        labelCredit.set_justify(Gtk.Justification.CENTER)
+        labelCredit.set_markup("\nA CyberSecurity Toolkit by Rob Braxman\n(c) Copyright Braxmobile Inc 2020\n")
 
-        #self.add(self.iconView)
-        gridMenu.attach(self.imageMenu,0,2,3,1)
+        buttonSniffStart = Gtk.Button("Start Monitoring Network")
+        buttonSniffStart.connect("clicked", self.on_button_sniff_start_clicked)
 
-        self.labelCredit = Gtk.Label()
-        self.labelCredit.set_justify(Gtk.Justification.CENTER)
-        self.labelCredit.set_markup("\nA CyberSecurity Toolkit by Rob Braxman\n(c) Copyright Braxmobile Inc 2019\n")
-        gridMenu.attach(self.labelCredit,0,3,3,1)
-        #gridMenu.attach(self.sboxDevice,1,2,2,1)
+        buttonSniffStop = Gtk.Button("Stop Monitoring Network")
+        buttonSniffStop.connect("clicked", self.on_button_sniff_stop_clicked)
+
+        self.sniffStatusLabel = Gtk.Label()
+        self.sniffStatusLabel.set_justify(Gtk.Justification.LEFT)
+        self.sniffStatusLabel.set_markup("\n<b><i>Inactive</i></b>")
+
+        # Attach Elements to Grid
+        #gridStart.attach(imageLogo,0,0,3,1)
+        gridStart.attach(labelStart,0,1,3,1)
+        gridStart.attach(imageStart,0,2,3,1)
+        gridStart.attach(labelCredit,0,8,3,1)
+        gridStart.attach(buttonSniffStart,0,3,3,1)
+        gridStart.attach(buttonSniffStop,0,4,3,1)
+        gridStart.attach(self.sniffStatusLabel,0,6,3,1)
+
 
         #---------------------------------------------------
-        self.pageMenu = gridMenu
-        self.pageMenu.set_border_width(10)
-        self.pageMenu.add(Gtk.Label(''))
-        #self.notebook.append_page(self.pageMenu, Gtk.Label('Start'))
+        # Attach Grid to Notebook Page
+        pageStart = gridStart
+        pageStart.set_border_width(10)
+        pageStart.add(Gtk.Label(''))
         self.notebook.append_page(
-            self.pageMenu,
+            pageStart,
             Gtk.Image.new_from_icon_name(
                 "help-about",
                 Gtk.IconSize.LARGE_TOOLBAR
@@ -107,97 +149,36 @@ class MainWindow(Gtk.Window):
 
 
 
-        #---------------------------------------------------
-        #---------------------------------------------------
-        gridSniff = Gtk.Grid()
-
-        self.labelSniff = Gtk.Label()
-        self.labelSniff.set_markup("<b>Sniff Packet Monitor</b>")
-        self.labelSniff.set_justify(Gtk.Justification.LEFT)
-        gridSniff.attach(self.labelSniff,1,0,2,1)
-
-        self.buttonStart = Gtk.Button("Start Sniff")
-        self.buttonStart.connect("clicked", self.on_buttonStart_clicked)
-        gridSniff.attach(self.buttonStart,1,1,1,1)
-
-        self.buttonStop = Gtk.Button("Stop Sniff")
-        self.buttonStop.connect("clicked", self.on_buttonStop_clicked)
-        gridSniff.attach(self.buttonStop,2,1,1,1)
-
-
-        self.sboxSniff = Gtk.ScrolledWindow()
-        self.sboxSniff.set_border_width(10)
-        self.sboxSniff.set_size_request(400,600)
-
-        self.monitormodel = Gtk.ListStore(str,str,str)
-        self.monitormodel.append(["Initialized","",""])
-
-        self.monitorView = Gtk.TreeView(self.monitormodel)
-
-        columnMon = Gtk.TreeViewColumn("Device MACAddress", Gtk.CellRendererText(), text=0)
-        self.monitorView.append_column(columnMon)
-
-        column2Mon = Gtk.TreeViewColumn("", Gtk.CellRendererText(), text=1)
-        self.monitorView.append_column(column2Mon)
-
-        column3Mon = Gtk.TreeViewColumn("", Gtk.CellRendererText(), text=2)
-        self.monitorView.append_column(column3Mon)
-
-
-        self.sboxSniff.add_with_viewport(self.monitorView)
-
-        gadjustment = Gtk.Adjustment(value=0, lower=0, upper=100,step_incr=1,page_incr=20, page_size=20)
-        self.sboxSniff.set_vadjustment(gadjustment)
-
-        gridSniff.attach(self.sboxSniff,1,2,2,1)
 
         #---------------------------------------------------
-        self.pageSniff = gridSniff
-        self.pageSniff.set_border_width(10)
-        self.pageSniff.add(Gtk.Label(''))
-        #self.notebook.append_page(self.pageSniff, Gtk.Label('Sniff'))
-        self.notebook.append_page(
-            self.pageSniff,
-            Gtk.Image.new_from_icon_name(
-                "view-refresh",
-                Gtk.IconSize.LARGE_TOOLBAR
-            ))
-
-
-        #---------------------------------------------------
+        # Set Up Notebook Page 3
         #---------------------------------------------------
         gridDevice = Gtk.Grid()
-        #self.add(grid3)
+        #---------------------------------------------------
 
-        self.labelDevice = Gtk.Label()
-        self.labelDevice.set_markup("<b>Network Device Scan</b>")
-        self.labelDevice.set_justify(Gtk.Justification.LEFT)
-        gridDevice.attach(self.labelDevice,1,0,2,1)
+        labelDevice = Gtk.Label()
+        labelDevice.set_markup("<b>Discovered Network Devices</b>")
+        labelDevice.set_justify(Gtk.Justification.LEFT)
 
-        self.buttonID = Gtk.Button("Identify Device")
-        self.buttonID.connect("clicked", self.on_buttonID_clicked)
-        gridDevice.attach(self.buttonID,1,1,1,1)
-
-        self.buttonJam = Gtk.Button("Jam Device")
-        self.buttonJam.connect("clicked", self.on_buttonJam_clicked)
-        gridDevice.attach(self.buttonJam,2,1,1,1)
-
-        self.buttonViewScan = Gtk.Button("View Last Scan")
-        self.buttonViewScan.connect("clicked", self.on_buttonID_clicked)
-        gridDevice.attach(self.buttonViewScan,1,2,1,1)
-
-        self.buttonPortScan = Gtk.Button("Port Scan")
-        self.buttonPortScan.connect("clicked", self.on_buttonPortScan_clicked)
-        gridDevice.attach(self.buttonPortScan,2,2,1,1)
+        buttonID = Gtk.Button("Identify Device")
+        buttonID.connect("clicked", self.on_button_device_id_clicked)
 
 
+        buttonJam = Gtk.Button("Jam Device")
+        buttonJam.connect("clicked", self.on_button_device_jam_clicked)
 
-        self.sboxDevice = Gtk.ScrolledWindow()
-        self.sboxDevice.set_border_width(10)
-        self.sboxDevice.set_size_request(400,600)
+        buttonViewScan = Gtk.Button("Active Device Scan")
+        buttonViewScan.connect("clicked", self.on_button_device_active_scan_clicked)
+
+        buttonPortScan = Gtk.Button("Port Scan")
+        buttonPortScan.connect("clicked", self.on_button_device_port_scan_clicked)
+
+
+        sboxDevice = Gtk.ScrolledWindow()
+        sboxDevice.set_border_width(10)
+        sboxDevice.set_size_request(400,400)
 
         self.arpmodel = Gtk.ListStore(str,str,str,str)
-        self.arpmodel.append(["Initialized","","",""])
         self.arpmodel.set_sort_column_id(0,0)
 
         self.arpView = Gtk.TreeView(self.arpmodel)
@@ -215,22 +196,47 @@ class MainWindow(Gtk.Window):
         self.arpView.append_column(column4Arp)
 
 
-        self.sboxDevice.add_with_viewport(self.arpView)
+        sboxDevice.add_with_viewport(self.arpView)
         select = self.arpView.get_selection()
-        select.connect("changed", self.on_arp_selection_changed)
+        select.connect("changed", self.on_tree_selection_changed)
 
         gadjustment = Gtk.Adjustment(value=0, lower=0, upper=100,step_incr=1,page_incr=20, page_size=20)
-        self.sboxDevice.set_vadjustment(gadjustment)
+        sboxDevice.set_vadjustment(gadjustment)
 
-        gridDevice.attach(self.sboxDevice,1,3,2,1)
+
+        sboxScan = Gtk.ScrolledWindow()
+        sboxScan.set_border_width(10)
+        sboxScan.set_size_request(400,300)
+
+        self.scanmodel = Gtk.ListStore(str)
+        self.scanView = Gtk.TreeView(self.scanmodel)
+        self.scanmodel.append(["Listening for Devices"])
+
+        columnScan = Gtk.TreeViewColumn("Scan Data", Gtk.CellRendererText(), text=0)
+        self.scanView.append_column(columnScan)
+
+        sboxScan.add_with_viewport(self.scanView)
+        select = self.scanView.get_selection()
+        select.connect("changed", self.on_tree_selection_changed)
+
+        gadjustment = Gtk.Adjustment(value=0, lower=0, upper=100,step_incr=1,page_incr=20, page_size=20)
+        sboxScan.set_vadjustment(gadjustment)
+
+        gridDevice.attach(labelDevice,1,0,2,1)
+        gridDevice.attach(buttonViewScan,1,1,1,1)
+        gridDevice.attach(buttonID,1,2,1,1)
+        gridDevice.attach(buttonJam,2,1,1,1)
+        gridDevice.attach(buttonPortScan,2,2,1,1)
+        gridDevice.attach(sboxDevice,1,3,2,1)
+        gridDevice.attach(sboxScan,1,4,2,1)
 
         #---------------------------------------------------
-        self.pageDevice = gridDevice
-        self.pageDevice.set_border_width(10)
-        self.pageDevice.add(Gtk.Label(''))
-        #self.notebook.append_page(self.pageDevice, Gtk.Label('Device Scan'))
+        pageDevice = gridDevice
+        pageDevice.set_border_width(10)
+        pageDevice.add(Gtk.Label(''))
+
         self.notebook.append_page(
-            self.pageDevice,
+            pageDevice,
             Gtk.Image.new_from_icon_name(
                 "system-search",
                 Gtk.IconSize.LARGE_TOOLBAR
@@ -239,18 +245,18 @@ class MainWindow(Gtk.Window):
 
 
         #---------------------------------------------------
+        # Set Up Notebook Page 4 - DNS
         #---------------------------------------------------
+        # Setup Grid
         gridDns = Gtk.Grid()
-        #self.add(grid2)
 
-        self.label3 = Gtk.Label()
-        self.label3.set_markup("<b>Real Time DNS Log</b>")
-        self.label3.set_justify(Gtk.Justification.LEFT)
-        gridDns.attach(self.label3,1,0,1,1)
+        label3 = Gtk.Label()
+        label3.set_markup("<b>Real Time DNS Log</b>")
+        label3.set_justify(Gtk.Justification.LEFT)
 
-        self.sboxDns = Gtk.ScrolledWindow()
-        self.sboxDns.set_border_width(10)
-        self.sboxDns.set_size_request(400,600)
+        sboxDns = Gtk.ScrolledWindow()
+        sboxDns.set_border_width(10)
+        sboxDns.set_size_request(400,700)
 
         self.logmodel = Gtk.ListStore(str,str)
         self.logmodel.append(["Initialized",""])
@@ -265,20 +271,21 @@ class MainWindow(Gtk.Window):
         column2 = Gtk.TreeViewColumn("Time Stamp", cellRenderer2, text=1)
         self.logView.append_column(column2)
 
-        self.sboxDns.add_with_viewport(self.logView)
+        sboxDns.add_with_viewport(self.logView)
 
         gadjustment = Gtk.Adjustment(value=0, lower=0, upper=100,step_incr=1,page_incr=20, page_size=20)
-        self.sboxDns.set_vadjustment(gadjustment)
+        sboxDns.set_vadjustment(gadjustment)
 
-        gridDns.attach(self.sboxDns,1,1,1,1)
+        gridDns.attach(label3,1,0,1,1)
+        gridDns.attach(sboxDns,1,1,1,1)
 
         #---------------------------------------------------
-        self.pageDns = gridDns
-        self.pageDns.set_border_width(10)
-        self.pageDns.add(Gtk.Label(''))
+        pageDns = gridDns
+        pageDns.set_border_width(10)
+        pageDns.add(Gtk.Label(''))
         #self.notebook.append_page(self.pageDns, Gtk.Label('DNS Trace'))
         self.notebook.append_page(
-            self.pageDns,
+            pageDns,
             Gtk.Image.new_from_icon_name(
                 "address-book-new",
                 Gtk.IconSize.LARGE_TOOLBAR
@@ -288,19 +295,19 @@ class MainWindow(Gtk.Window):
 
 
         #---------------------------------------------------
+        # Set Up Notebook Page 5
         #---------------------------------------------------
         gridMITM = Gtk.Grid()
 
 
-        self.labelDnsHist = Gtk.Label()
-        self.labelDnsHist.set_justify(Gtk.Justification.LEFT)
-        self.labelDnsHist.set_markup("<b>DNS History - Scanned Domain List</b>")
-        gridMITM.attach(self.labelDnsHist,1,0,1,1)
+        labelDnsHist = Gtk.Label()
+        labelDnsHist.set_justify(Gtk.Justification.LEFT)
+        labelDnsHist.set_markup("<b>DNS History - Unique Domain List</b>")
 
-        self.sbox = Gtk.ScrolledWindow()
-        self.sbox.set_border_width(10)
-        self.sbox.set_size_request(400,400)
-        gridMITM.attach(self.sbox,1,1,1,1)
+        sbox = Gtk.ScrolledWindow()
+        sbox.set_border_width(10)
+        sbox.set_size_request(400,400)
+
 
         self.model = Gtk.ListStore(str)
 
@@ -309,61 +316,144 @@ class MainWindow(Gtk.Window):
         column = Gtk.TreeViewColumn("Select a Domain", Gtk.CellRendererText(), text=0)
         self.treeView.append_column(column)
         self.model.set_sort_column_id(0,0)
-        self.sbox.add_with_viewport(self.treeView)
+
+        sbox.add_with_viewport(self.treeView)
         select = self.treeView.get_selection()
         select.connect("changed", self.on_tree_selection_changed)
 
         gadjustment = Gtk.Adjustment(value=0, lower=0, upper=100,step_incr=1,page_incr=20, page_size=20)
-        self.sbox.set_vadjustment(gadjustment)
+        sbox.set_vadjustment(gadjustment)
 
-        self.labelDomain = Gtk.Label()
-        #self.label.set_text("Enter Fully Qualified Domain Name")
-        self.labelDomain.set_markup("<b>Enter Fully Qualified Domain Name</b>")
-        self.labelDomain.set_justify(Gtk.Justification.LEFT)
-        gridMITM.attach(self.labelDomain,1,2,1,1)
+        labelDomain = Gtk.Label()
+        labelDomain.set_markup("<b>Enter Fully Qualified Domain Name</b>")
+        labelDomain.set_justify(Gtk.Justification.LEFT)
 
         self.entry = Gtk.Entry()
         self.entry.set_text("")
-        gridMITM.attach(self.entry,1,3,1,1)
+
 
         self.check = Gtk.Button("Check for MITM")
         self.check.connect("clicked", self.on_check_clicked)
-        gridMITM.attach(self.check,1,4,1,1)
-
 
         self.status = Gtk.Label()
         self.status.set_justify(Gtk.Justification.LEFT)
         self.status.set_markup("\n<i>Scanning DNS Queries</i>")
+
+        gridMITM.attach(labelDnsHist,1,0,1,1)
+        gridMITM.attach(sbox,1,1,1,1)
+        gridMITM.attach(labelDomain,1,2,1,1)
+        gridMITM.attach(self.entry,1,3,1,1)
+        gridMITM.attach(self.check,1,4,1,1)
         gridMITM.attach(self.status,1,5,1,1)
 
-        self.pageMITM = gridMITM
-        self.pageMITM.set_border_width(10)
-        self.pageMITM.add(Gtk.Label(''))
+        pageMITM = gridMITM
+        pageMITM.set_border_width(10)
+        pageMITM.add(Gtk.Label(''))
         #self.notebook.append_page(self.pageMITM, Gtk.Label('MITM Check'))
         self.notebook.append_page(
-        self.pageMITM,
+        pageMITM,
         Gtk.Image.new_from_icon_name(
             "application-certificate",
             Gtk.IconSize.LARGE_TOOLBAR
         ))
 
+        if False:
+            #---------------------------------------------------
+            # Set Up Notebook Page 2
+            #---------------------------------------------------
+            # Setup Grid
+            gridSniff = Gtk.Grid()
+            #---------------------------------------------------
+
+            labelSniff = Gtk.Label()
+            labelSniff.set_markup("<b>Raw Packet Data</b>")
+            labelSniff.set_justify(Gtk.Justification.LEFT)
 
 
+            sboxSniff = Gtk.ScrolledWindow()
+            sboxSniff.set_border_width(10)
+            sboxSniff.set_size_request(400,700)
+
+            self.monitormodel = Gtk.ListStore(str,str,str)
+            self.monitormodel.append(["Initialized","",""])
+
+            self.monitorView = Gtk.TreeView(self.monitormodel)
+
+            columnMon = Gtk.TreeViewColumn("Device MACAddress", Gtk.CellRendererText(), text=0)
+            self.monitorView.append_column(columnMon)
+
+            column2Mon = Gtk.TreeViewColumn("", Gtk.CellRendererText(), text=1)
+            self.monitorView.append_column(column2Mon)
+
+            column3Mon = Gtk.TreeViewColumn("", Gtk.CellRendererText(), text=2)
+            self.monitorView.append_column(column3Mon)
 
 
+            sboxSniff.add_with_viewport(self.monitorView)
 
+            gadjustment = Gtk.Adjustment(value=0, lower=0, upper=100,step_incr=1,page_incr=20, page_size=20)
+            sboxSniff.set_vadjustment(gadjustment)
 
+            gridSniff.attach(labelSniff,1,0,2,1)
+            gridSniff.attach(sboxSniff,1,2,2,1)
+
+            #---------------------------------------------------
+            # Attach Grid to Notebook Page
+
+            pageSniff = gridSniff
+            pageSniff.set_border_width(10)
+            pageSniff.add(Gtk.Label(''))
+
+            self.notebook.append_page(
+                pageSniff,
+                Gtk.Image.new_from_icon_name(
+                    "view-refresh",
+                    Gtk.IconSize.LARGE_TOOLBAR
+                ))
 
 
         #---------------------------------------------------
-        os.system("sudo ifconfig wlp1s0 promisc")
-
+        # Set Up Notebook Page 6
         #---------------------------------------------------
+        gridMITM = Gtk.Grid()
 
-        cleanupThread = threading.Thread(target=self.treeCleanup, )
-        cleanupThread.daemon = True
-        #daemons get automatically closed when app exits
-        cleanupThread.start()
+
+        labelHelp = Gtk.Label()
+        labelHelp.set_justify(Gtk.Justification.LEFT)
+        labelHelp.set_markup("<b>About Catch MITM</b>\n\n"+
+            "\nThis app is used to track unusual traffic or "+
+            "\ndevices on your network. Start sniffing "+
+            "\nyour network and wait for it to accumulate "+
+            "\ndata. \n"+
+            "\nIt will record all IP addresses, DNS "+
+            "\nrequests, detect devices, track the traffic "+
+            "\nwith external IP addresses, allow you to "+
+            "\ncheck for spoofed (fake) https certificates. "+
+            "\nAnd identify all devices in your subnet. \n"+
+            "\nYou can manually assign names to devices you "+
+            "\nrecognize. Then if an unusual device "+
+            "\nappears, it may be an attacker. You can use "+
+            "\nthe JAM feature to shutdown network access "+
+            "\nby that device. \n"+
+            "\nLeave this running when you're not using  " +
+            "\nyour device. It will detect malware that's " +
+            "\ncommunicating in the background. \n"+
+            "\nBy default, this only sniffs your own "+
+            "\nlocal subnet. ")
+
+        gridMITM.attach(labelHelp,1,0,1,1)
+
+        pageMITM = gridMITM
+        pageMITM.set_border_width(10)
+        pageMITM.add(Gtk.Label(''))
+        #self.notebook.append_page(self.pageMITM, Gtk.Label('MITM Check'))
+        self.notebook.append_page(
+        pageMITM,
+        Gtk.Image.new_from_icon_name(
+            "system-help",
+            Gtk.IconSize.LARGE_TOOLBAR
+        ))
+
 
 
     def on_MainWindow_deleted(self, * args):
@@ -373,30 +463,7 @@ class MainWindow(Gtk.Window):
         #self.scapy.kill()
         sys.exit()
 
-    def on_check_clicked(self, button):
-        self.certcheck()
-
-    def on_buttonPortScan_clicked(self,button):
-        selection = self.arpView.get_selection()
-        model, treeiter = selection.get_selected()
-        if treeiter is not None:
-            target_ip = self.arpmodel.get_value(treeiter,0)
-            print("Port Scan IP Address "+target_ip )
-            self.info_dialog("Port Scan","device IP "+target_ip,"scan")
-        return
-
-    def on_buttonJam_clicked(self, button):
-        selection = self.arpView.get_selection()
-        model, treeiter = selection.get_selected()
-        if treeiter is not None:
-            self.status.set_text("")
-            value = self.arpmodel.get_value(treeiter,0)
-            print("Jam IP Address "+value )
-            self.info_dialog("Jamming Device","device IP "+value,"jam")
-
-    def on_buttonID_clicked(self, button):
-        self.setvalue_dialog("Set Identity","Device Description","id")
-
+    # Start GTK Specific
     def on_tree_selection_changed(self, selection):
         model, treeiter = selection.get_selected()
         if treeiter is not None:
@@ -405,13 +472,107 @@ class MainWindow(Gtk.Window):
         cursor = Gdk.Cursor.new(Gdk.CursorType.ARROW)
         self.get_root_window().set_cursor(cursor)
 
-    def on_arp_selection_changed(self, selection):
+    def SearchTreeRows(self,store, searchstr):
+        #print("\nsearch>%s"%searchstr)
+        try:
+            treeiter = store.get_iter_first()
+            while treeiter != None:
+
+                if store[treeiter][0] ==searchstr:
+                    #print("found in:%s"%str(store[treeiter][:]))
+                    return(False)
+
+                #print("searched:%s"%str(store[treeiter][:]))
+                treeiter = store.iter_next(treeiter)
+        except:
+            print('Dup Error')
+            return(True)
+        return(True)
+
+    def cleanupModels(self):
+
+
+        #while (len(self.monitormodel) > 100000):
+        #    n = len(self.monitormodel)
+        #    treeiter = self.monitormodel.iter_nth_child(None, 501 - 1)
+        #    if treeiter:
+        #        self.monitormodel.remove(treeiter)
+
+        while (len(self.logmodel) > 2000):
+            if self.sniffStatus == True:
+                self.monitorLock.acquire()
+                n = len(self.logmodel)
+                treeiter = self.logmodel.iter_nth_child(None, 501 - 1)
+                if treeiter:
+                    self.logmodel.remove(treeiter)
+                self.monitorLock.release()
+            time.sleep(10)
+        return self.netDevice
+
+    # END GTK Specific
+
+
+    #--------------------------------------------------------------------
+    # On-button-clicked Section
+    #--------------------------------------------------------------------
+
+    def on_check_clicked(self, button):
+        self.certcheck()
+
+    def on_button_device_port_scan_clicked(self,button):
+        if self.portScanningStatus:
+            self.portScanningStatus = False
+            self.scanmodel.append(["Stopping Port Scan"])
+
+            return
+
+        selection = self.arpView.get_selection()
         model, treeiter = selection.get_selected()
         if treeiter is not None:
-            self.entry.set_text(model[treeiter][0])
+            target_ip = self.arpmodel.get_value(treeiter,0)
+            target_ip = target_ip.replace("\n","")
+            print("Port Scan IP Address "+target_ip )
+            self.info_dialog("Port Scan","device IP "+target_ip,"scan")
+        return
+
+    def on_button_device_jam_clicked(self, button):
+        selection = self.arpView.get_selection()
+        model, treeiter = selection.get_selected()
+        if treeiter is not None:
             self.status.set_text("")
-        cursor = Gdk.Cursor.new(Gdk.CursorType.ARROW)
-        self.get_root_window().set_cursor(cursor)
+            value = self.arpmodel.get_value(treeiter,0)
+            value = value.replace("\n","")
+            print("Jam IP Address "+value )
+            self.info_dialog("Jamming Device","device IP "+value,"jam")
+
+    def on_button_device_id_clicked(self, button):
+        self.setvalue_dialog("Set Identity","Give Device a Custom\nName","id")
+
+    def on_button_sniff_start_clicked(self,button):
+        self.sniffStatusLabel.set_markup("\n<b><i>Monitoring active.\nSwitch tabs to view data.</i></b>")
+        #self.monitormodel.clear()
+        self.sniffStatus = True
+        self.scapy = threading.Thread(target=self.start_sniff, )
+        self.scapy.daemon = True
+        # daemons get automatically closed when app exits
+        self.scapy.start()
+
+        #self.scapyPing = threading.Thread(target=self.ping_scan(True), )
+        #self.scapyPing.daemon = True
+        # daemons get automatically closed when app exits
+        #self.scapyPing.start()
+
+
+    def on_button_sniff_stop_clicked(self, button):
+        self.sniffStatusLabel.set_markup("\n<b><i>Network sniffing paused. Data retained.</i></b>")
+        self.sniffStatus = False
+
+    def on_button_device_active_scan_clicked(self, button):
+        self.info_dialog("Active Device Search", "Perform active device\nsearch with ARP?\n\nAfter the request is made\nit takes a moment before\ndevices get reported." , "activearp")
+
+    #--------------------------------------------------------------------
+    # End -On-button-clicked Section
+    #--------------------------------------------------------------------
 
     def certcheck(self):
 
@@ -566,10 +727,11 @@ class MainWindow(Gtk.Window):
                     hostname, alias, ipaddrlist = socket.gethostbyaddr( pkt[ARP].psrc )
                 except:
                     #print('Unknown Host '+pkt[ARP].psrc)
-                    hostname = 'Unknown'
+                    hostname = ''
 
                 treeiter = self.arpmodel.get_iter_first()
-                self.arpmodel.insert_before(treeiter,[pkt[ARP].psrc, macfake+"\n"+macvendortext+"\n"+hostname,  devicedesc, mac ])
+                self.arpmodel.insert_before(treeiter,[pkt[ARP].psrc+"\n\n", macfake+"\n"+macvendortext+"\n"+hostname,  devicedesc+"\n\n", mac+"\n\n" ])
+
                 #print(bytes(pkt[ARP]))
             except error:
                 print('Arp Error')
@@ -603,11 +765,11 @@ class MainWindow(Gtk.Window):
                 data = pkt.sprintf(proto+" %IP.src%"+sport+" --> %IP.dst%"+dport+"")
 
                 #data = pkt.summary()
-                treeiter = self.monitormodel.get_iter_first()
-                if data:
-                    self.monitorLock.acquire()
-                    self.monitormodel.insert_before(treeiter, [data, "", "" ])
-                    self.monitorLock.release()
+                #treeiter = self.monitormodel.get_iter_first()
+                #if data:
+                    #self.monitorLock.acquire()
+                    #self.monitormodel.insert_before(treeiter, [data, "", "" ])
+                    #self.monitorLock.release()
             except error:
                 print('TCP Error')
 
@@ -615,54 +777,25 @@ class MainWindow(Gtk.Window):
 
 
     def start_sniff(self):
+        #repeat discovery in case network changes
+        self.discoverNetDevice()
+
         self.discovered_if = self.setNetDevice()
-        print(self.discovered_if)
+        #print(self.discovered_if)
         interface = self.discovered_if
-        interface = ""
+        #interface = ""
         if interface !='':
             sniff(iface = interface, filter = "", prn = self.querysniff, store = 0, stop_filter=self.sniff_stopfilter)
         else:
             sniff(filter="", prn=self.querysniff, store=0, stop_filter=self.sniff_stopfilter)
         print("\n[*] Shutting sniff...")
 
-    def on_buttonStart_clicked(self,button):
-        self.monitormodel.clear()
-        self.sniffStatus = True
-        self.scapy = threading.Thread(target=self.start_sniff, )
-        self.scapy.daemon = True
-        # daemons get automatically closed when app exits
-        self.scapy.start()
-
-        self.scapyPing = threading.Thread(target=self.ping_scan, )
-        self.scapyPing.daemon = True
-        # daemons get automatically closed when app exits
-        self.scapyPing.start()
-
-
-    def on_buttonStop_clicked(self, button):
-        self.sniffStatus = False
 
     def sniff_stopfilter(self, pkt):
         if self.sniffStatus == False:
             return True
         return False
 
-    def SearchTreeRows(self,store, searchstr):
-        #print("\nsearch>%s"%searchstr)
-        try:
-            treeiter = store.get_iter_first()
-            while treeiter != None:
-
-                if store[treeiter][0] ==searchstr:
-                    #print("found in:%s"%str(store[treeiter][:]))
-                    return(False)
-
-                #print("searched:%s"%str(store[treeiter][:]))
-                treeiter = store.iter_next(treeiter)
-        except:
-            print('Dup Error')
-            return(True)
-        return(True)
 
     def dns_resolve(self,domain):
         myResolver = dns.resolver.Resolver()
@@ -677,40 +810,37 @@ class MainWindow(Gtk.Window):
         self.status.set_text(statusText)
         return dns_array
 
-    def setNetDevice(self):
+
+    def discoverNetDevice(self):
         dict_if = psutil.net_if_addrs()
-        print('Discovered If Interfaces')
+        #print('Discovered If Interfaces')
         self.discovered_if = []
         for key in dict_if:
 
             inet = dict_if[key][0][1]
             netmask = dict_if[key][0][2]
-
             if inet is not None and netmask is not None and inet != '127.0.0.1':
-                self.subnet = inet
-                self.netmask = netmask
                 print(self.subnet+" "+self.netmask)
+
             #print('\n'+key, '->', dict_if[key][0])
             if key != 'lo':
                 self.discovered_if.append(key)
+            if key[0] == 'w':
+                self.netmask = netmask
+                self.subnet = inet
+                #print('\nInet' + self.subnet)
+                #print('\nNetmask' + self.netmask)
+                #print('\nDiscovered Wifi ='+key)
+                self.netDevice = key
+                f = open(self.appdataDir+"wifi-device.conf","w")
+                f.write(key)
+                f.close()
 
-        f = open(self.installDir+"wifi-device.conf","r")
-        wlan = f.read().replace("\n","")There
-            while (len(self.monitormodel) > 100000):
-                n = len(self.monitormodel)
-                treeiter = self.monitormodel.iter_nth_child(None, 501 - 1)
-                if treeiter:
-                    self.monitormodel.remove(treeiter)
+    def setNetDevice(self):
 
-            while (len(self.logmodel) > 2000):
-                if self.sniffStatus == True:
-                    self.monitorLock.acquire()
-                    n = len(self.logmodel)
-                    treeiter = self.logmodel.iter_nth_child(None, 501 - 1)
-                    if treeiter:
-                        self.logmodel.remove(treeiter)
-                    self.monitorLock.release()
-            time.sleep(10)
+        f = open(self.appdataDir+"wifi-device.conf","r")
+        self.netDevice = f.read().replace("\n","")
+
 
     def info_dialog(self, title, message, action):
         dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.INFO,
@@ -728,7 +858,9 @@ class MainWindow(Gtk.Window):
                 model, treeiter = selection.get_selected()
                 if treeiter is not None:
                     mac = self.arpmodel.get_value(treeiter, 3)
+                    mac = mac.replace("\n","")
                     ip = self.arpmodel.get_value(treeiter, 0)
+                    ip = ip.replace("\n","")
                     print(mac+"/"+ip)
 
                     self.scapyJam = threading.Thread(target=self.jam_loop,args=(mac, ip) )
@@ -736,10 +868,12 @@ class MainWindow(Gtk.Window):
                     # daemons get automatically closed when app exits
                     self.scapyJam.start()
 
-                    self.msg_dialog("Jamming","Jam inifinitely. Click OK to Stop")
+                    self.msg_dialog("Jamming","Jam inifinitely. Click OK to Stop","jam")
+                    self.scanmodel.clear()
+                    self.scanmodel.append(["Jammed Network for " + ip])
                 return
             elif action == 'scan':
-                print("Scanning")
+                #print("Scanning")
                 dialog.destroy()
                 self.jamStatus = True
 
@@ -747,11 +881,22 @@ class MainWindow(Gtk.Window):
                 model, treeiter = selection.get_selected()
                 if treeiter is not None:
                     target_ip = self.arpmodel.get_value(treeiter, 0)
+                    target_ip = target_ip.replace("\n","")
 
-                    self.scapyScan = threading.Thread(target=self.port_scan, args=(target_ip,) )
+                    self.scapyScan = threading.Thread(target=self.port_scan, args=(target_ip,))
                     self.scapyScan.daemon = True
                     # daemons get automatically closed when app exits
                     self.scapyScan.start()
+
+                return
+            elif action == 'activearp':
+                #print("Scanning")
+                dialog.destroy()
+
+                self.scapyPing = threading.Thread(target=self.ping_scan, args=())
+                self.scapyPing.daemon = True
+                # daemons get automatically closed when app exits
+                self.scapyPing.start()
 
                 return
             else:
@@ -791,15 +936,17 @@ class MainWindow(Gtk.Window):
             model, treeiter = selection.get_selected()
             if treeiter is not None:
                 mac = self.arpmodel.get_value(treeiter, 3)
-                self.arpmodel.set_value(treeiter, 2, devicedesc)
+                mac = mac.replace("\n","")
+
+                self.arpmodel.set_value(treeiter, 2, devicedesc+"\n\n")
                 self.deviceDescList[mac] = devicedesc
-                pickle.dump(self.deviceDescList, open("_devicelist.dict", "wb"))
+                pickle.dump(self.deviceDescList, open(self.appdataDir+"_devicelist.dict", "wb"))
 
         elif response == Gtk.ResponseType.CANCEL:
             print("Cancelled")
         dialog.destroy()
 
-    def msg_dialog(self, title, message):
+    def msg_dialog(self, title, message, action):
         dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.INFO,
                                    Gtk.ButtonsType.OK, title)
         dialog.format_secondary_text(message)
@@ -809,95 +956,138 @@ class MainWindow(Gtk.Window):
         elif response == Gtk.ResponseType.CANCEL:
             print("Cancelled")
         dialog.destroy()
-        self.jamStatus = False
+        if action == 'jam':
+            self.jamStatus = False
+        #if action == 'general':
+        #   no action
         print('Stopped')
 
     def jam_loop(self, xhwdst, xpdst):
+        if self.sniffStatus == False:
+            self.msg_dialog("Jam Device", "Please start sniffing network first","general")
+            return
         xhwsrc = get_if_hwaddr(conf.iface)
         xpsrc = "192.168.1.1"
         #xhwsrc = "11:11:11:11:11:11:11:11"
         while self.jamStatus:
             print(xhwsrc + "/" + xpsrc + "-->" + xhwdst + "/" + xpdst)
             packet = Ether()/ARP(op="who-has",hwsrc=xhwsrc, hwdst=xhwdst, psrc=xpsrc, pdst=xpdst)
-            sendp(packet)
+            sendp(packet, verbose=False)
             x2pdst = "192.168.1.1"
             print(xhwsrc + "/" + xpsrc + "-->" + xhwdst + "/" + x2pdst)
             packet = Ether()/ARP(op="who-has",hwsrc=xhwsrc, psrc=xpsrc, pdst=x2pdst)
-            sendp(packet)
+            sendp(packet,verbose=False)
             x3pdst = "192.168.1.91"
             x3hwsrc = "11:11:11:11:11:11:11:11"
             print(xhwsrc + "/" + xpsrc + "-->" + xhwdst + "/" + x3pdst)
             packet = Ether()/ARP(op="who-has",hwsrc=x3hwsrc, psrc=xpsrc, pdst=xpdst)
-            sendp(packet)
+            sendp(packet, verbose=False)
             time.sleep(.3)
             #print(bytes(response))
         return
-    def ping_scan(self):
 
+    def ping_scan(self):
+        if self.sniffStatus == False:
+            self.msg_dialog("Active Device Scan", "Please start sniffing network first","general")
+            return
 
         inet = self.subnet.split(".")
+        #print(self.subnet)
         subnet = self.netmask.split(".")
         TIMEOUT = 2
         conf.verb = 0
         if int(subnet[2]) == 255:
-            ip3range = [int(inet[2])]
+            ip3range = [ int( inet[2] )]
         else:
             ip3range = range(0,255)
         ip4range = range(1,255)
+        self.scanmodel.clear()
+        print("Active device scan")
+        self.scanmodel.append(["Active Device Search "])
+        self.scanmodel.append( ["ARP " + inet[0]+"."+inet[1]+"."+str(ip3range)+"."+str(ip4range)+""])
         for ip3 in ip3range:
             for ip4 in ip4range:
-                ip_dst = "192.168."+str(ip3)+"."+str(ip4)
+                ip_dst = subnet[0]+"."+subnet[1]+"."+str(ip3)+"."+str(ip4)
+                #packet = IP(dst=ip_dst) / ICMP()
+                #print(sr1(packet))
                 packet = Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=ip_dst)
-                sendp(packet)
+                sendp(packet,verbose=False)
                 #print('ARP '+ip_dst)
+        self.scanmodel.append( ["ARP Requests Completed"])
+        self.scanmodel.append( ["Listening for Answers"])
         return
 
+
     def port_scan(self, target_ip):
-        print('Scan loop '+target_ip)
-        scanList = [22,443,80,5900]
+        if self.sniffStatus == False:
+            self.msg_dialog("Device Port Scan", "Please start sniffing network first","general")
+            return
+        print('Scan '+target_ip)
+        self.scanmodel.clear()
+        self.scanmodel.append(["Port Scan Started for "+target_ip+"."])
 
-        scanned22 = self.port_scan_single(target_ip,22)
-        scanned80 = self.port_scan_single(target_ip,80)
-        scanned8080 = self.port_scan_single(target_ip,8080)
-        scanned443 = self.port_scan_single(target_ip,443)
-        scanned5900 = self.port_scan_single(target_ip,5900)
-        scanned53 = self.port_scan_single(target_ip,53)
+        #set flag to initiate scan
+        self.portScanningStatus = True
 
-        if(scanned22 or scanned5900):
-            print("LinuxLike")
-        if(scanned80 or scanned443 or scanned8080 ):
-            print("Webservice")
-        if(scanned53 ):
-            print("Gateway")
+        for port in self.portList:
+            if not self.portScanningStatus:
+                self.scanmodel.append(["Port Scan Stopped"])
+                return
+            portstatus = self.port_scan_single(target_ip, int(port))
+            if portstatus:
 
+                if int(port) == 22 or int(port) == 5900:
+                    self.scanmodel.append(["LinuxLike"])
+                    print("LinuxLike")
+                if int(port) == 80 or int(port) == 443 or int(port) == 8080 :
+                    self.scanmodel.append(["HasWebservice"])
+                    print("HasWebservice")
+                if int(port) == 53 :
+                    self.scanmodel.append(["Gateway"])
+                    print("Gateway")
+        self.scanmodel.append(["Port Scan Complete"])
+        print("Quick Port Scan Complete")
+        self.portScanningStatus = False
         return
 
     def port_scan_single(self, target_ip, port):
-        dst_ip = target_ip
+        dst_ip = target_ip.replace("\n","")
         src_port = RandShort()
         dst_port = port
 
         try:
+            #Send SYN FLAG to port
+            stealth_scan_resp = sr1(IP(dst=dst_ip) / TCP(sport=src_port, dport=dst_port, flags="S"), timeout=10, verbose=False)
+            #print("Type"+str(type(stealth_scan_resp)))
 
-            stealth_scan_resp = sr1(IP(dst=dst_ip) / TCP(sport=src_port, dport=dst_port, flags="S"), timeout=10)
             if (str(type(stealth_scan_resp)) == "<type 'NoneType'>"):
                 print("Filtered")
-                return None
+                return False
             elif (stealth_scan_resp.haslayer(TCP)):
+                #print('Has Layer TCP')
+                #print(stealth_scan_resp.getlayer(TCP).flags)
                 if (stealth_scan_resp.getlayer(TCP).flags == 0x12):
-                    send_rst = sr(IP(dst=dst_ip) / TCP(sport=src_port, dport=dst_port, flags="R"), timeout=10)
-                print("Open"+str(port))
-                return True
+                    #Scan stopped
+                    if not self.portScanningStatus:
+                        return False
+                    #wait for RST + ACK
+                    send_rst = sr(IP(dst=dst_ip) / TCP(sport=src_port, dport=dst_port, flags="R"), timeout=10, verbose=False)
+                    print("Open "+str(port))
+                    self.scanmodel.append(["Open Port "+str(port)+" "+self.portList[str(port)]])
+                    return True
             elif (stealth_scan_resp.getlayer(TCP).flags == 0x14):
                 print ("Closed"+str(port))
+                self.scanmodel.append(["Closed Port"+str(port)])
                 return False
             elif (stealth_scan_resp.haslayer(ICMP)):
                 if (int(stealth_scan_resp.getlayer(ICMP).type) == 3 and
-                    int(stealth_scan_resp.getlayer(ICMP).code) in [1, 2, 3, 9, 10, 13]):
+                int(stealth_scan_resp.getlayer(ICMP).code) in [1, 2, 3, 9, 10, 13]):
                     print ("Filtered"+str(port))
-                    return None
+                    return False
         except:
-            print("Error"+str(port))
+            print("Error "+str(port)+" "+target_ip)
+            self.portScanningStatus = False
+            self.scanmodel.append(["Unreachable"])
             return False
         return False
 
