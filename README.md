@@ -11,11 +11,15 @@ FOR UBUNTU 18.04
 For Dev Environment:
 
 sudo snap install pycharm-community --classic
+
 sudo apt-get install python3-pip
 
 For Required Python Modules:
+
 sudo apt-get install python3-scapy
+
 sudo pip3 install dnspython
+
 sudo pip3 install psutil
 
 
