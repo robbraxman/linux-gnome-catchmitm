@@ -1,5 +1,5 @@
 # linux-gnome-catchmitm
-(C) Copyright Braxmobile Inc 2019 - GPL V3 License - Free Software
+(C) Copyright Braxmobile Inc 2020 - GPL V3 License - Free Software
 
 The purpose of this app is for network intrusion detection. It can identify all 
 devices on your subnet. It tracks all unique DNS calls. You are able to check
