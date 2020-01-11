@@ -332,7 +332,7 @@ class MainWindow(Gtk.Window):
         self.entry.set_text("")
 
 
-        self.check = Gtk.Button("Check for MITM")
+        self.check = Gtk.Button("Check for Spoofed Certificate")
         self.check.connect("clicked", self.on_check_clicked)
 
         self.status = Gtk.Label()
