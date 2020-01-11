@@ -36,7 +36,12 @@ sudo snap install pycharm-community --classic
 
 sudo apt-get install python3-pip
 
-For Required Python Modules:
+
+To Install:
+
+Copy all the files to your desired directory (e.g. ~/Documents/catchmitm).
+
+Install the required Python modules.
 
 sudo apt-get install python3-scapy
 
@@ -45,6 +50,11 @@ sudo pip3 install dnspython
 sudo pip3 install psutil
 
 
-To run:
 
-sudo python3 catchmitm.py
+To run, go to that directory and run
+
+./start.sh
+
+
+
+
