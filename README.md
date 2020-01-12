@@ -11,7 +11,8 @@ unknown device, you can jam the identified device.
 
 Limitations: This only works on your current subnet. By default, it is
 designed to be used in wireless (wifi mode) though that can be altered
-easily in the code. 
+easily in the code. Listed devices do not get removed if you change your
+network. For best results, restart the app when you change networks.
 
 UI: the UI is currently GTK+ 3 for Gnome. It is sized for a smartphone so
 in theory it should be sized for a Linux phone like a Librem 5. Because it 

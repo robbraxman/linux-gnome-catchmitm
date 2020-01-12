@@ -151,7 +151,7 @@ class MainWindow(Gtk.Window):
 
 
         #---------------------------------------------------
-        # Set Up Notebook Page 3
+        # Set Up Notebook Page 2
         #---------------------------------------------------
         gridDevice = Gtk.Grid()
         #---------------------------------------------------
@@ -245,7 +245,7 @@ class MainWindow(Gtk.Window):
 
 
         #---------------------------------------------------
-        # Set Up Notebook Page 4 - DNS
+        # Set Up Notebook Page 3 - DNS
         #---------------------------------------------------
         # Setup Grid
         gridDns = Gtk.Grid()
@@ -295,7 +295,7 @@ class MainWindow(Gtk.Window):
 
 
         #---------------------------------------------------
-        # Set Up Notebook Page 5
+        # Set Up Notebook Page 4
         #---------------------------------------------------
         gridMITM = Gtk.Grid()
 
@@ -359,7 +359,7 @@ class MainWindow(Gtk.Window):
 
         if False:
             #---------------------------------------------------
-            # Set Up Notebook Page 2
+            # Set Up Notebook Page 5
             #---------------------------------------------------
             # Setup Grid
             gridSniff = Gtk.Grid()
@@ -456,7 +456,7 @@ class MainWindow(Gtk.Window):
 
 
 
-    def on_MainWindow_deleted(self, * args):
+    def on_main_window_deleted(self, * args):
         print('Destroy Main Window')
 
         Gtk.main_quit()
@@ -825,7 +825,7 @@ class MainWindow(Gtk.Window):
             #print('\n'+key, '->', dict_if[key][0])
             if key != 'lo':
                 self.discovered_if.append(key)
-            if key[0] == 'w':
+            #if key[0] == 'w':
                 self.netmask = netmask
                 self.subnet = inet
                 #print('\nInet' + self.subnet)
@@ -1091,7 +1091,8 @@ class MainWindow(Gtk.Window):
             return False
         return False
 
+
 win = MainWindow()
-win.connect("destroy", win.on_MainWindow_deleted)
+win.connect("destroy", win.on_main_window_deleted)
 win.show_all()
 Gtk.main()
