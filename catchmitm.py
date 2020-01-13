@@ -825,7 +825,7 @@ class MainWindow(Gtk.Window):
             #print('\n'+key, '->', dict_if[key][0])
             if key != 'lo':
                 self.discovered_if.append(key)
-            #if key[0] == 'w':
+            if key[0] == 'w':
                 self.netmask = netmask
                 self.subnet = inet
                 #print('\nInet' + self.subnet)
