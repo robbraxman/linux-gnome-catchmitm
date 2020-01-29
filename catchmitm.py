@@ -15,6 +15,7 @@ from datetime import datetime
 import threading
 import dns.resolver
 import psutil
+import os
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib, Gdk, GObject
@@ -42,19 +43,27 @@ class MainWindow(Gtk.Window):
     subnet = ""
     netmask = ""
     installDir = ""
-    appdataDir = "appdata/"
-    netDevice = ""
+    appdataDir = ""
+    netDevice = ""                                                                                      
     portScanningStatus = False
+    userlogin = ""
 
     def __init__(self):
 
         #os.system('clear')
         print('Starting Catch MITM')
+        self.userlogin = os.getlogin()
+        self.appdataDir = "/home/"+self.userlogin+"/.config/catchmitm"
+        os.system("mkdir "+self.appdataDir)
+        subprocess.call(["chmod","0755",self.appdataDir+"/wifi-device.conf"])
+        subprocess.call(["chmod","0755",self.appdataDir+"/_devicelist.dict"])
+        print("User File area ->"+self.appdataDir)
 
 
         try:
-            self.deviceDescList = pickle.load(open(self.appdataDir+"_devicelist.dict", "rb"))
-        except:
+            self.deviceDescList = pickle.load(open(self.appdataDir+"/_devicelist.dict", "rb"))
+        except Exception as e:
+            print(e)
             print('No devicelist')
 
         self.ui_gtk_init()
@@ -62,7 +71,7 @@ class MainWindow(Gtk.Window):
         self.monitorLock = threading.Semaphore()
         self.discoverNetDevice()
         #---------------------------------------------------
-        os.system("sudo ifconfig "+self.netDevice+" promisc")
+        #os.system("sudo ifconfig "+self.netDevice+" promisc")
         #---------------------------------------------------
 
         #cleanupThread = threading.Thread(target=self.treeCleanup, )
@@ -832,13 +841,13 @@ class MainWindow(Gtk.Window):
                 #print('\nNetmask' + self.netmask)
                 #print('\nDiscovered Wifi ='+key)
                 self.netDevice = key
-                f = open(self.appdataDir+"wifi-device.conf","w")
+                f = open(self.appdataDir+"/wifi-device.conf","w")
                 f.write(key)
                 f.close()
-
+                subprocess.call(["chmod","0755",self.appdataDir+"/wifi-device.conf"])
     def setNetDevice(self):
 
-        f = open(self.appdataDir+"wifi-device.conf","r")
+        f = open(self.appdataDir+"/wifi-device.conf","r")
         self.netDevice = f.read().replace("\n","")
 
 
@@ -940,7 +949,8 @@ class MainWindow(Gtk.Window):
 
                 self.arpmodel.set_value(treeiter, 2, devicedesc+"\n\n")
                 self.deviceDescList[mac] = devicedesc
-                pickle.dump(self.deviceDescList, open(self.appdataDir+"_devicelist.dict", "wb"))
+                pickle.dump(self.deviceDescList, open(self.appdataDir+"/_devicelist.dict", "wb"))
+                subprocess.call(["chmod","0755",self.appdataDir+"/_devicelist.dict"])
 
         elif response == Gtk.ResponseType.CANCEL:
             print("Cancelled")

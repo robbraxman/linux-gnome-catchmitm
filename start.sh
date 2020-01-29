@@ -1,1 +1,1 @@
-sudo python3 catchmitm.py
+sudo python catchmitm.py

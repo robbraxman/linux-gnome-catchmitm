@@ -35,20 +35,27 @@ For Dev Environment:
 
 sudo snap install pycharm-community --classic
 
-sudo apt-get install python3-pip
+sudo apt-get install python-pip
 
 
 To Install:
+
+*************
+Note: this was changed from Python3 to Python 2.7 to support an Ubuntu Touch Phone
+
+*************
 
 Copy all the files to your desired directory (e.g. ~/Documents/catchmitm).
 
 Install the required Python modules.
 
-sudo apt-get install python3-scapy
+sudo apt-get install python-scapy
 
-sudo pip3 install dnspython
+sudo apt-get install python-requests
 
-sudo pip3 install psutil
+sudo pip install dnspython
+
+sudo pip install psutil
 
 
 
